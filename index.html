@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Binaural We Beats</title>
+  <meta name="description" content="Binaural, monaural and isochronic beat generator with noise and nature soundscapes. Runs entirely in your browser.">
+  <meta name="theme-color" content="#0b1020">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='22' cy='32' r='16' fill='%2338bdf8' fill-opacity='.8'/%3E%3Ccircle cx='42' cy='32' r='16' fill='%23f472b6' fill-opacity='.8'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to controls</a>
+
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="22" cy="32" r="16" fill="#38bdf8" fill-opacity=".8"/>
+        <circle cx="42" cy="32" r="16" fill="#f472b6" fill-opacity=".8"/>
+      </svg>
+      <h1>Binaural We Beats</h1>
+    </div>
+    <div class="topbar-actions">
+      <button id="theme-toggle" class="icon-btn" type="button" aria-label="Theme: auto">◐</button>
+      <button id="help" class="icon-btn" type="button" aria-label="Help, safety and shortcuts">?</button>
+    </div>
+  </header>
+
+  <div id="hp-banner" class="banner" role="note">
+    <span class="banner-icon" aria-hidden="true">🎧</span>
+    <p><strong id="hp-title">Headphones required.</strong> <span id="hp-text">Binaural beats only work when each ear hears its own tone. Speakers blend the two tones and the effect disappears.</span></p>
+  </div>
+
+  <main id="main" class="layout">
+    <!-- HERO ----------------------------------------------------------- -->
+    <section class="card hero" aria-label="Player">
+      <div class="viz-wrap">
+        <canvas id="viz" aria-hidden="true"></canvas>
+        <div class="viz-overlay">
+          <span id="band-chip" class="chip band-chip">Alpha</span>
+          <span id="beat-readout" class="beat-readout">10.00 Hz</span>
+          <span class="lr-readout"><span class="lr-l">L <span id="freq-l">195.00</span> Hz</span> · <span class="lr-r">R <span id="freq-r">205.00</span> Hz</span></span>
+        </div>
+      </div>
+
+      <div class="transport">
+        <button id="stop" class="round-btn" type="button" aria-label="Stop" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        </button>
+        <button id="play" class="play-btn" type="button" aria-pressed="false" aria-label="Play">
+          <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+          <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></svg>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+        <button id="test-lr" class="round-btn" type="button" aria-label="Test left and right headphone channels" title="Test L/R channels">
+          <span class="lr-test-label">L/R</span>
+        </button>
+      </div>
+
+      <div class="timer-row">
+        <span id="timer" class="timer">00:00 / 30:00</span>
+        <span id="play-label" class="play-label">Ready</span>
+      </div>
+      <div class="progress" aria-hidden="true"><div id="progress-bar" class="progress-bar"></div></div>
+      <p id="segment-label" class="segment-label"></p>
+      <p id="test-indicator" class="test-indicator" hidden></p>
+    </section>
+
+    <!-- CONTROLS ------------------------------------------------------- -->
+    <section class="card controls" aria-label="Beat settings">
+      <div class="tabs" role="tablist" aria-label="Mode">
+        <button id="tab-manual" role="tab" type="button" aria-controls="panel-manual" aria-selected="true">Manual</button>
+        <button id="tab-programs" role="tab" type="button" aria-controls="panel-programs" aria-selected="false">Programs</button>
+      </div>
+
+      <div id="panel-manual" role="tabpanel" aria-labelledby="tab-manual">
+        <fieldset class="field">
+          <legend>Beat type</legend>
+          <div class="segmented" id="mode-group">
+            <label><input type="radio" name="mode" value="binaural" checked><span>Binaural</span></label>
+            <label><input type="radio" name="mode" value="monaural"><span>Monaural</span></label>
+            <label><input type="radio" name="mode" value="isochronic"><span>Isochronic</span></label>
+          </div>
+          <p id="mode-blurb" class="hint"></p>
+        </fieldset>
+
+        <div class="field">
+          <div class="field-head">
+            <label for="beat-num">Beat frequency</label>
+            <span id="beat-band" class="chip band-chip small">Alpha</span>
+          </div>
+          <div class="slider-row">
+            <input id="beat-range" type="range" min="0" max="1000" step="1" aria-label="Beat frequency slider">
+            <span class="num-wrap"><input id="beat-num" type="number" min="0.5" max="45" step="0.01" inputmode="decimal"><span class="unit">Hz</span></span>
+          </div>
+          <p id="beat-band-text" class="hint"></p>
+        </div>
+
+        <div class="field">
+          <div class="field-head"><label for="carrier-num">Carrier tone</label></div>
+          <div class="slider-row">
+            <input id="carrier-range" type="range" min="0" max="1000" step="1" aria-label="Carrier frequency slider">
+            <span class="num-wrap"><input id="carrier-num" type="number" min="60" max="1000" step="0.01" inputmode="decimal"><span class="unit">Hz</span></span>
+          </div>
+          <p class="hint">The pitch you hear. Lower is softer and less fatiguing; binaural beats work best below about 500 Hz.</p>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label for="waveform">Waveform</label>
+            <select id="waveform">
+              <option value="sine">Sine (recommended)</option>
+              <option value="triangle">Triangle</option>
+              <option value="square">Square</option>
+              <option value="sawtooth">Sawtooth</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="session">Session length</label>
+            <select id="session">
+              <option value="0">No limit</option>
+              <option value="5">5 min</option>
+              <option value="10">10 min</option>
+              <option value="15">15 min</option>
+              <option value="20">20 min</option>
+              <option value="30">30 min</option>
+              <option value="45">45 min</option>
+              <option value="60">60 min</option>
+              <option value="90">90 min</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="fadein">Fade in</label>
+            <select id="fadein">
+              <option value="0">None</option>
+              <option value="3">3 s</option>
+              <option value="5">5 s</option>
+              <option value="10">10 s</option>
+              <option value="20">20 s</option>
+              <option value="30">30 s</option>
+            </select>
+          </div>
+        </div>
+
+        <details class="carriers">
+          <summary>Carrier tone presets <span class="muted">(Solfeggio, 432 Hz…)</span></summary>
+          <p class="hint">Traditional / esoteric associations. These have no established scientific basis.</p>
+          <ul id="carrier-list" class="carrier-list"></ul>
+        </details>
+      </div>
+
+      <div id="panel-programs" role="tabpanel" aria-labelledby="tab-programs" hidden>
+        <p class="hint">Programs glide the beat frequency over time to guide you from one state to another. Select one, then press play.</p>
+        <ul id="program-list" class="program-list"></ul>
+        <button id="program-clear" class="text-btn" type="button">← Back to manual</button>
+      </div>
+    </section>
+
+    <!-- MIXER ---------------------------------------------------------- -->
+    <section class="card mixer" aria-labelledby="mixer-title">
+      <h2 id="mixer-title">Mixer</h2>
+      <p class="hint">Layer noise or nature sounds over the beats. Background layers play while a session is running.</p>
+      <div class="mixer-grid">
+        <div class="channel">
+          <div id="knob-tone" class="knob-slot" data-label="Beats"></div>
+          <span class="channel-name">Beats</span>
+        </div>
+        <div class="channel">
+          <div id="knob-noise" class="knob-slot" data-label="Noise volume"></div>
+          <label class="channel-name" for="noise-type">Noise</label>
+          <select id="noise-type">
+            <option value="off">Off</option>
+            <option value="white">White noise</option>
+            <option value="pink">Pink noise</option>
+            <option value="brown">Brown noise</option>
+          </select>
+        </div>
+        <div class="channel">
+          <div id="knob-nature" class="knob-slot" data-label="Nature volume"></div>
+          <label class="channel-name" for="nature-type">Nature</label>
+          <select id="nature-type">
+            <option value="off">Off</option>
+            <option value="waves">Crashing waves</option>
+            <option value="rain">Rain</option>
+            <option value="thunder">Thunder</option>
+            <option value="rainthunder">Rain + thunder</option>
+          </select>
+          <span id="nature-status" class="status-text" aria-live="polite"></span>
+        </div>
+        <div class="channel master">
+          <div id="knob-master" class="knob-slot" data-label="Master volume"></div>
+          <span class="channel-name">Master</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CATALOGUE ------------------------------------------------------ -->
+    <section class="card catalogue" aria-labelledby="catalogue-title">
+      <h2 id="catalogue-title">Frequencies &amp; what they're for</h2>
+      <p class="hint">Tap a card to load it. Each brainwave band is traditionally associated with a different mental state.</p>
+      <ul id="band-legend" class="band-legend"></ul>
+      <div id="band-filter" class="filter-chips" role="group" aria-label="Filter by band"></div>
+      <ul id="preset-grid" class="preset-grid"></ul>
+      <p id="disclaimer" class="disclaimer"></p>
+    </section>
+
+    <!-- ABOUT ---------------------------------------------------------- -->
+    <section class="card about" aria-labelledby="about-title">
+      <h2 id="about-title">How it works</h2>
+      <div class="about-grid">
+        <div>
+          <h3>Binaural beats</h3>
+          <p>Each ear gets a slightly different tone, for example 195 Hz left and 205 Hz right. Your brain perceives a gentle 10 Hz "beat" that isn't in the sound itself. <strong>This only works with headphones.</strong></p>
+        </div>
+        <div>
+          <h3>Monaural beats</h3>
+          <p>The same two tones are mixed together before reaching your ears, so the beat is a real, physical wobble in loudness. It works on speakers too.</p>
+        </div>
+        <div>
+          <h3>Isochronic tones</h3>
+          <p>A single tone switched on and off at the beat rate. This is the most pronounced pulse of the three and it works on speakers.</p>
+        </div>
+        <div>
+          <h3>Noise &amp; nature</h3>
+          <p>White, pink and brown noise or rain, waves and thunder mask distractions and make long sessions more pleasant. Brown noise and waves are the softest.</p>
+        </div>
+      </div>
+      <p class="hint">Shortcuts: <kbd>Space</kbd> play/pause · <kbd>Esc</kbd> stop.</p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Runs entirely in your browser. No accounts, no tracking. Not a medical device.</p>
+  </footer>
+
+  <!-- WELCOME / SAFETY ------------------------------------------------- -->
+  <dialog id="welcome" aria-labelledby="welcome-title">
+    <form method="dialog" class="welcome">
+      <div class="welcome-icon" aria-hidden="true">🎧</div>
+      <h2 id="welcome-title">Put your headphones on</h2>
+      <p class="lead">Binaural beats <strong>require stereo headphones or earbuds.</strong> Each ear must hear a different tone. Through speakers the two tones blend in the air and the effect is lost.</p>
+      <ul class="safety">
+        <li>Start at a <strong>low volume</strong> and raise it gradually.</li>
+        <li>Do <strong>not</strong> use while driving, operating machinery, or doing anything that needs your full attention.</li>
+        <li>If you have epilepsy or a seizure disorder, a heart condition or pacemaker, or are pregnant, talk to a doctor first.</li>
+        <li>Stop if you feel discomfort, dizziness or anxiety.</li>
+        <li>This is not a medical device. Effects vary from person to person.</li>
+      </ul>
+      <p class="hint">Tip: press <strong>L/R</strong> next to the play button to check that your headphones are on the right way round.</p>
+      <p class="hint">Shortcuts: <kbd>Space</kbd> play/pause · <kbd>Esc</kbd> stop.</p>
+      <button id="welcome-ok" class="primary-btn" value="ok">I'm wearing headphones. Continue</button>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="alert" hidden>
+    <span id="toast-text"></span>
+    <button id="toast-close" class="icon-btn small" type="button" aria-label="Dismiss">×</button>
+  </div>
+  <div id="live" class="sr-only" aria-live="polite"></div>
+  <noscript><p class="noscript">This app needs JavaScript and the Web Audio API.</p></noscript>
+</body>
+</html>
