@@ -26,6 +26,7 @@
       <h1>Binaural We Beats</h1>
     </div>
     <div class="topbar-actions">
+      <a class="pill-btn donate-link" href="#donate">♥ Donate</a>
       <button id="install" class="pill-btn" type="button" hidden>⤓ Install app</button>
       <button id="theme-toggle" class="icon-btn" type="button" aria-label="Theme: auto">◐</button>
       <button id="help" class="icon-btn" type="button" aria-label="Help, safety and shortcuts">?</button>
@@ -356,10 +357,30 @@
       </div>
       <p class="hint">Shortcuts: <kbd>Space</kbd> play/pause · <kbd>Esc</kbd> stop. Install it from your browser menu to use it offline.</p>
     </section>
+
+    <!-- DONATE --------------------------------------------------------- -->
+    <section id="donate" class="card donate" aria-labelledby="donate-title">
+      <div class="donate-grid">
+        <img class="donate-qr" src="icons/xmr-qr.svg" width="196" height="196"
+             alt="QR code for the Monero donation address">
+        <div class="donate-body">
+          <h2 id="donate-title"><span class="xmr-badge" aria-hidden="true">ɱ</span> Support this project</h2>
+          <p>Binaural We Beats is free, open source, ad-free and tracker-free. If it helps you relax, focus or sleep, you can say thanks with a donation in <strong>Monero (XMR)</strong>.</p>
+          <p class="hint">Scan the QR code with your wallet, or copy the address below.</p>
+          <code id="xmr-address" class="xmr-address">85cSWLFurZj8XbKWX7Kk3u1oUtp5vLGQcLSfXEdGnTUU5P9mik6GCPk8guPfAwzHdFFUCbDKChZEphQyp6BNMQwo5oyPLUD</code>
+          <div class="donate-actions">
+            <button id="xmr-copy" class="primary-btn" type="button" data-address="85cSWLFurZj8XbKWX7Kk3u1oUtp5vLGQcLSfXEdGnTUU5P9mik6GCPk8guPfAwzHdFFUCbDKChZEphQyp6BNMQwo5oyPLUD">Copy address</button>
+            <a class="pill-btn" href="monero:85cSWLFurZj8XbKWX7Kk3u1oUtp5vLGQcLSfXEdGnTUU5P9mik6GCPk8guPfAwzHdFFUCbDKChZEphQyp6BNMQwo5oyPLUD">Open in wallet</a>
+            <span id="xmr-status" class="status-text" aria-live="polite"></span>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="footer">
     <p>Runs entirely in your browser. No accounts, no tracking. Not a medical device.</p>
+    <p><a href="#donate">♥ Donate with Monero</a> · <a href="https://github.com/djshellshoxxx/binauralwebeats" rel="noopener">Source on GitHub</a></p>
   </footer>
 
   <!-- WELCOME / SAFETY ------------------------------------------------- -->

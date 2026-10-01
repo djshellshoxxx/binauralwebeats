@@ -1,6 +1,6 @@
 // Service worker (spec 07 §12): network-first with offline fallback.
 // Bump VERSION when the app-shell list changes.
-const VERSION = 'v2-1';
+const VERSION = 'v2-2';
 const CACHE = `binauralwebeats-${VERSION}`;
 
 const APP_SHELL = [
@@ -12,6 +12,7 @@ const APP_SHELL = [
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/maskable-512.png',
+  'icons/xmr-qr.svg',
   'js/main.js',
   'js/app/controller.js',
   'js/app/exporter.js',
@@ -27,6 +28,7 @@ const APP_SHELL = [
   'js/engine/program.js',
   'js/engine/wav.js',
   'js/ui/controls.js',
+  'js/ui/donate.js',
   'js/ui/dom.js',
   'js/ui/editor.js',
   'js/ui/format.js',

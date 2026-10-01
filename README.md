@@ -1,8 +1,13 @@
 # Binaural We Beats
 
-A browser-based **binaural beat generator** with monaural and isochronic modes,
-timed programs, noise colours and procedurally generated nature sounds
-(crashing waves, rain, thunder, rain + thunder).
+### ▶ [Open the live web app](https://djshellshoxxx.github.io/binauralwebeats/)
+
+**https://djshellshoxxx.github.io/binauralwebeats/**: put on headphones and press play. Nothing to install.
+
+A browser-based **binaural beat generator** with monaural, isochronic and
+bilateral modes, timed programs, a program editor, noise colours,
+procedurally generated nature sounds, a Shepard-tone illusion, a breathing
+pacer and WAV export.
 
 It is pure static HTML/CSS/JavaScript: **no build step, no dependencies, no
 tracking.**
@@ -111,6 +116,20 @@ The app was built to these specs in [`docs/specs/`](docs/specs):
 | [05 Quality](docs/specs/05-quality.md) | Tests, browser support, performance, deployment, CI |
 | [06 Roadmap](docs/specs/06-roadmap.md) | Other audio techniques (all built) |
 | [07 v2 features](docs/specs/07-v2-features.md) | Spec for every v2 feature |
+
+## Support the project ♥
+
+Binaural We Beats is free, open source, ad-free and tracker-free. If it helps
+you, donations in **Monero (XMR)** are gratefully received:
+
+<p align="center"><img src="icons/xmr-qr.svg" width="180" alt="Monero donation QR code"></p>
+
+```
+85cSWLFurZj8XbKWX7Kk3u1oUtp5vLGQcLSfXEdGnTUU5P9mik6GCPk8guPfAwzHdFFUCbDKChZEphQyp6BNMQwo5oyPLUD
+```
+
+The same address and QR code are in the **Support this project** section at the
+bottom of the [web app](https://djshellshoxxx.github.io/binauralwebeats/#donate).
 
 ## Disclaimer
 

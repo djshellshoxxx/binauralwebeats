@@ -9,6 +9,7 @@ import { createEditor } from './ui/editor.js';
 import { bindSystem } from './ui/system.js';
 import { createVisualizer } from './ui/visualizer.js';
 import { setupPWA } from './ui/pwa.js';
+import { bindDonate } from './ui/donate.js';
 
 function safeStorage() {
   try { return globalThis.localStorage || null; } catch { return null; }
@@ -31,6 +32,7 @@ function boot() {
     breathLabel: document.getElementById('breath-label'),
   });
   setupPWA({ installButton: document.getElementById('install') });
+  bindDonate();
 
   if (!(globalThis.AudioContext || globalThis.webkitAudioContext)) {
     document.getElementById('play').disabled = true;
