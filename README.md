@@ -75,8 +75,10 @@ sudo git -C /var/www/binauralwebeats pull && echo "Updated"
 
 ### GitHub Pages
 
-A workflow (`.github/workflows/pages.yml`) publishes the site from `main`.
-Enable it under **Settings → Pages → Source: GitHub Actions**.
+Live at **https://djshellshoxxx.github.io/binauralwebeats/**
+
+`.github/workflows/static.yml` redeploys the site on every push to the default
+branch (Settings → Pages → Source: GitHub Actions).
 
 ## Develop
 

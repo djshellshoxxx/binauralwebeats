@@ -43,7 +43,7 @@ from `file://`.
 
 - Local: `python3 -m http.server 8080`, then open `http://localhost:8080`.
 - nginx: copy the repo into the web root (`/var/www/binauralwebeats`). The default `mime.types` already serves `.js` as JavaScript.
-- GitHub Pages: enable Pages from the default branch. A workflow is provided (`.github/workflows/pages.yml`).
+- GitHub Pages (primary host): https://djshellshoxxx.github.io/binauralwebeats/. `.github/workflows/static.yml` deploys on every push to the default branch. All asset URLs are relative, so the app works under the `/binauralwebeats/` sub-path.
 
 ## 6. CI
 
