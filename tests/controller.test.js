@@ -21,6 +21,14 @@ function fakeEngine() {
     async setNature(v) { calls.push(['setNature', v]); },
     async testChannels() { calls.push(['test']); return { rightAt: 0, duration: 0 }; },
     ensureRunning() { calls.push(['ensureRunning']); },
+    setTimbre(v) { calls.push(['setTimbre', v]); },
+    async setIllusion(v) { calls.push(['setIllusion', v]); },
+    setVoices(v) { calls.push(['setVoices', v]); },
+    setSpatial(v) { calls.push(['setSpatial', v]); },
+    setLayerPulse(v) { calls.push(['setLayerPulse', v]); },
+    setBreath(v) { calls.push(['setBreath', v]); },
+    setSchedule(v) { calls.push(['setSchedule', v]); },
+    breathOrigin: 0,
   };
   return engine;
 }
@@ -146,4 +154,106 @@ test('L/R test cycles left → right → idle', async () => {
   await controller.testChannels();
   assert.deepEqual(sides, ['left', 'right', null]);
   assert.equal(store.get().status, 'idle');
+});
+
+test('start passes duration and fade-down to the engine', async () => {
+  const { engine, controller } = setup({ sessionMinutes: 20, fadeDownMinutes: 10 });
+  await controller.start();
+  const [, , opts] = engine.calls.find((c) => c[0] === 'start');
+  assert.equal(opts.duration, 1200);
+  assert.equal(opts.fadeDownMinutes, 10);
+  controller.setFadeDown(15);
+  assert.deepEqual(engine.calls.at(-1), ['setSchedule', { fadeDownMinutes: 15 }]);
+  controller.setSessionMinutes(45);
+  assert.deepEqual(engine.calls.find((c) => c[0] === 'setSchedule' && c[1].duration), ['setSchedule', { duration: 2700 }]);
+});
+
+test('bilateral special preset switches mode; band preset switches back', () => {
+  const { store, controller } = setup();
+  controller.applySpecial('bilateral-1');
+  assert.equal(store.get().mode, 'bilateral');
+  assert.equal(store.get().beat, 1);
+  controller.applyPreset('alpha-10');
+  assert.equal(store.get().mode, 'binaural');
+});
+
+test('voice stack loads main tone and both voices', () => {
+  const { store, engine, controller } = setup();
+  controller.applyStack('stack-focus');
+  const st = store.get();
+  assert.equal(st.beat, 14);
+  assert.equal(st.voices[0].on, true);
+  assert.equal(st.voices[0].beat, 40);
+  assert.ok(engine.calls.some((c) => c[0] === 'setVoices'));
+  controller.setVoice(1, { on: false, beat: 999 });
+  assert.equal(store.get().voices[1].on, false);
+  assert.equal(store.get().voices[1].beat, 45);
+});
+
+test('effects and breath intents validate input', () => {
+  const { store, controller } = setup();
+  controller.setSpatial(8);
+  controller.setSpatial(7);
+  controller.setLayerPulse(0.6);
+  controller.setBreathPattern('box');
+  controller.setBreathPattern('nope');
+  controller.setBreathCue(true);
+  controller.setTimbre('pad');
+  controller.setIllusion('shepard-up', 0.2);
+  const st = store.get();
+  assert.equal(st.spatialRate, 8);
+  assert.equal(st.layerPulse, 0.6);
+  assert.equal(st.breathPattern, 'box');
+  assert.equal(st.breathCue, true);
+  assert.equal(st.timbre, 'pad');
+  assert.equal(st.illusionType, 'shepard-up');
+  assert.equal(st.illusionVolume, 0.2);
+});
+
+test('custom programs: save (new + edit), select, delete', () => {
+  const { store, controller } = setup();
+  const draft = { name: 'My Wind Down', description: 'test', segments: [
+    { label: 'A', duration: 60, beat: [10, 6], carrier: [200, 180] },
+    { label: 'B', duration: 120, beat: [6, 3], carrier: [180, 150] },
+  ] };
+  const bad = controller.saveCustomProgram({ ...draft, segments: [{ label: 'x', duration: 0, beat: [1, 1], carrier: [200, 200] }] });
+  assert.equal(bad.ok, false);
+  const res = controller.saveCustomProgram(draft);
+  assert.equal(res.ok, true);
+  assert.ok(res.program.id.startsWith('custom-'));
+  assert.equal(store.get().customPrograms.length, 1);
+  controller.selectProgram(res.program.id);
+  assert.equal(store.get().activeProgramId, res.program.id);
+  const edited = controller.saveCustomProgram({ ...res.program, name: 'Renamed' });
+  assert.equal(edited.ok, true);
+  assert.equal(store.get().customPrograms.length, 1);
+  assert.equal(store.get().customPrograms[0].name, 'Renamed');
+  assert.equal(controller.deleteCustomProgram(res.program.id), true);
+  assert.equal(store.get().customPrograms.length, 0);
+  assert.equal(store.get().activeProgramId, null);
+});
+
+test('export uses the injected renderer and reports status', async () => {
+  const settings = { ...DEFAULT_SETTINGS, acknowledged: true, exportMinutes: 5, exportRate: 22050 };
+  const store = createStore({ ...settings, ...runtimeState(settings) });
+  let args = null;
+  const exporter = async (a) => { args = a; a.onProgress(0.5); return new ArrayBuffer(8); };
+  const controller = createController({ store, engine: fakeEngine(), timers, exporter });
+  const res = await controller.exportAudio();
+  assert.equal(args.seconds, 300);
+  assert.equal(args.sampleRate, 22050);
+  assert.ok(res.fileName.endsWith('-5min.wav'));
+  assert.equal(store.get().exportStatus.state, 'done');
+  controller.selectProgram('power-nap');
+  controller.setExportMinutes('program');
+  assert.equal(controller.exportSeconds(), 1200);
+});
+
+test('export failure is reported, not thrown', async () => {
+  const settings = { ...DEFAULT_SETTINGS, acknowledged: true };
+  const store = createStore({ ...settings, ...runtimeState(settings) });
+  const controller = createController({ store, engine: fakeEngine(), timers, exporter: async () => { throw new Error('no offline'); } });
+  assert.equal(await controller.exportAudio(), null);
+  assert.equal(store.get().exportStatus.state, 'error');
+  assert.equal(store.get().exportStatus.message, 'no offline');
 });

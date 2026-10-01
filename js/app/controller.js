@@ -1,36 +1,47 @@
 // Controller: the only module that talks to both the store and the engine
-// (spec 03 §3). UI code calls these intents; it never touches the engine.
+// (spec 03 §3, spec 07). UI code calls these intents; it never touches the engine.
 
-import { sanitizeBeat, sanitizeCarrier, MODES, WAVEFORMS } from '../engine/frequency.js';
-import { paramsAt, programDuration } from '../engine/program.js';
-import { findCarrier, findPreset, findProgram } from './presets.js';
-import { PERSISTED_KEYS, saveSettings, SESSION_MINUTES, FADE_IN_OPTIONS, THEMES, TABS } from './persistence.js';
+import { sanitizeBeat, sanitizeCarrier, MODES, WAVEFORMS, TIMBRES } from '../engine/frequency.js';
+import { paramsAt, programDuration, validateProgram } from '../engine/program.js';
+import { BREATH_IDS } from '../engine/breath.js';
+import { SPATIAL_RATES, LAYER_PULSE_LEVELS } from '../engine/audio-engine.js';
+import { NATURE_LABELS, ILLUSION_LABELS } from '../engine/ambience.js';
+import { findCarrier, findPreset, findProgram, findSpecial, findStack } from './presets.js';
+import {
+  PERSISTED_KEYS, saveSettings, SESSION_MINUTES, FADE_IN_OPTIONS, FADE_DOWN_OPTIONS, THEMES, TABS,
+  EXPORT_MINUTES, EXPORT_RATES, MAX_CUSTOM_PROGRAMS,
+} from './persistence.js';
+import { exportFileName, MAX_EXPORT_SECONDS, renderSessionWav } from './exporter.js';
 
 export const FADE_OUT = 3;
 const TICK_MS = 200;
 const SAVE_DEBOUNCE_MS = 300;
 
-export function createController({ store, engine, storage = null, timers = globalThis }) {
+export function createController({
+  store, engine, storage = null, timers = globalThis, now = () => Date.now(), exporter = renderSessionWav,
+}) {
   let tick = null;
   let stopping = false;
   let saveTimer = null;
   let announceSeq = 0;
+  let idleBreathOrigin = now();
 
   const s = () => store.get();
   const engineSettings = (st) => ({
-    mode: st.mode, carrier: st.carrier, beat: st.beat, waveform: st.waveform,
+    mode: st.mode, carrier: st.carrier, beat: st.beat, waveform: st.waveform, timbre: st.timbre,
     toneVolume: st.toneVolume, noiseType: st.noiseType, noiseVolume: st.noiseVolume,
-    natureType: st.natureType, natureVolume: st.natureVolume, masterVolume: st.masterVolume,
+    natureType: st.natureType, natureVolume: st.natureVolume,
+    illusionType: st.illusionType, illusionVolume: st.illusionVolume, masterVolume: st.masterVolume,
+    voices: st.voices, spatialRate: st.spatialRate, layerPulse: st.layerPulse,
+    breathPattern: st.breathPattern, breathCue: st.breathCue,
   });
 
   function announce(text) {
     store.set({ announcement: { text, n: ++announceSeq } });
   }
 
-  function activeProgram() {
-    const id = s().activeProgramId;
-    return id ? findProgram(id) : null;
-  }
+  const lookupProgram = (id) => findProgram(id, s().customPrograms);
+  const activeProgram = () => lookupProgram(s().activeProgramId);
 
   function liveFor(st, program, elapsed) {
     if (program) {
@@ -39,6 +50,11 @@ export function createController({ store, engine, storage = null, timers = globa
         segmentLabel: program.segments[p.segmentIndex].label };
     }
     return { carrier: st.carrier, beat: st.beat, segmentIndex: -1, segmentLabel: '' };
+  }
+
+  function sessionDuration(st, program) {
+    if (program) return programDuration(program);
+    return st.sessionMinutes > 0 ? st.sessionMinutes * 60 : Infinity;
   }
 
   // ------------------------------------------------------------ clock
@@ -81,11 +97,11 @@ export function createController({ store, engine, storage = null, timers = globa
       return;
     }
     const program = activeProgram();
-    const duration = program ? programDuration(program) : (st.sessionMinutes > 0 ? st.sessionMinutes * 60 : Infinity);
+    const duration = sessionDuration(st, program);
     stopping = false;
     store.set({ status: 'starting', error: null, elapsed: 0, duration, live: liveFor(st, program, 0) });
     try {
-      await engine.start(engineSettings(st), { program, fadeIn: st.fadeIn });
+      await engine.start(engineSettings(st), { program, fadeIn: st.fadeIn, duration, fadeDownMinutes: st.fadeDownMinutes });
     } catch (err) {
       store.set({ status: 'idle', error: (err && err.message) || 'Audio could not start.' });
       return;
@@ -118,6 +134,7 @@ export function createController({ store, engine, storage = null, timers = globa
     stopping = true;
     stopTick();
     store.set({ status: 'idle', elapsed: 0, live: liveFor(st, null, 0) });
+    idleBreathOrigin = now();
     await engine.stop(FADE_OUT);
     stopping = false;
   }
@@ -143,7 +160,7 @@ export function createController({ store, engine, storage = null, timers = globa
   }
 
   function presetStillMatches(st, carrier, beat) {
-    const p = st.activePresetId && findPreset(st.activePresetId);
+    const p = st.activePresetId && (findPreset(st.activePresetId) || findSpecial(st.activePresetId) || findStack(st.activePresetId));
     return p && p.carrier === carrier && p.beat === beat ? p.id : null;
   }
 
@@ -159,17 +176,41 @@ export function createController({ store, engine, storage = null, timers = globa
     applyTone({ beat, activePresetId: presetStillMatches(s(), s().carrier, beat) });
   }
 
-  function applyPreset(id) {
-    const p = findPreset(id);
-    if (!p) return;
+  function canChangeTone() {
     const st = s();
     if (st.activeProgramId && st.status !== 'idle') {
       announce('Stop the program before choosing a preset');
-      return;
+      return false;
     }
+    return true;
+  }
+
+  function applyPreset(id) {
+    const p = findPreset(id);
+    if (!p || !canChangeTone()) return;
     store.set({ activeProgramId: null, tab: 'manual' });
+    if (s().mode === 'bilateral') setMode('binaural');
     applyTone({ carrier: p.carrier, beat: p.beat, activePresetId: p.id });
     announce(`${p.name}: ${p.beat} Hz`);
+  }
+
+  function applySpecial(id) {
+    const p = findSpecial(id);
+    if (!p || !canChangeTone()) return;
+    store.set({ activeProgramId: null, tab: 'manual' });
+    setMode(p.mode);
+    applyTone({ carrier: p.carrier, beat: p.beat, activePresetId: p.id });
+    announce(`${p.name}: ${p.beat} Hz ${p.mode}`);
+  }
+
+  function applyStack(id) {
+    const stack = findStack(id);
+    if (!stack || !canChangeTone()) return;
+    store.set({ activeProgramId: null, tab: 'manual' });
+    if (s().mode === 'bilateral') setMode('binaural');
+    applyTone({ carrier: stack.carrier, beat: stack.beat, activePresetId: stack.id });
+    setVoices(stack.voices.map((v) => ({ ...v })));
+    announce(`${stack.name} loaded`);
   }
 
   function applyCarrierPreset(id) {
@@ -184,9 +225,50 @@ export function createController({ store, engine, storage = null, timers = globa
       announce('Stop playback before changing program');
       return;
     }
-    const program = id ? findProgram(id) : null;
+    const program = id ? lookupProgram(id) : null;
     store.set({ activeProgramId: program ? program.id : null, tab: program ? 'programs' : s().tab });
     if (program) announce(`${program.name} selected. Press play to begin.`);
+  }
+
+  // ------------------------------------------------------------ custom programs
+
+  function saveCustomProgram(draft) {
+    const st = s();
+    const isNew = !draft.id || !draft.id.startsWith('custom-');
+    const program = {
+      id: isNew ? `custom-${now()}` : draft.id,
+      name: String(draft.name || '').trim().slice(0, 60),
+      description: String(draft.description || '').trim().slice(0, 240),
+      segments: (draft.segments || []).map((seg) => ({
+        label: String(seg.label || '').trim().slice(0, 60) || 'Segment',
+        duration: Number(seg.duration),
+        beat: [Number(seg.beat[0]), Number(seg.beat[1])],
+        carrier: [Number(seg.carrier[0]), Number(seg.carrier[1])],
+      })),
+    };
+    const errors = validateProgram(program);
+    if (errors.length) return { ok: false, errors };
+    const list = st.customPrograms.filter((p) => p.id !== program.id);
+    if (isNew && list.length >= MAX_CUSTOM_PROGRAMS) return { ok: false, errors: [`You can save up to ${MAX_CUSTOM_PROGRAMS} programs.`] };
+    const idx = st.customPrograms.findIndex((p) => p.id === program.id);
+    const next = [...st.customPrograms];
+    if (idx >= 0) next[idx] = program; else next.push(program);
+    store.set({ customPrograms: next });
+    announce(`Saved ${program.name}`);
+    return { ok: true, program, errors: [] };
+  }
+
+  function deleteCustomProgram(id) {
+    const st = s();
+    if (st.status !== 'idle' && st.activeProgramId === id) {
+      announce('Stop playback before deleting this program');
+      return false;
+    }
+    const next = st.customPrograms.filter((p) => p.id !== id);
+    if (next.length === st.customPrograms.length) return false;
+    store.set({ customPrograms: next, activeProgramId: st.activeProgramId === id ? null : st.activeProgramId });
+    announce('Program deleted');
+    return true;
   }
 
   // ------------------------------------------------------------ sound
@@ -201,6 +283,12 @@ export function createController({ store, engine, storage = null, timers = globa
     if (!WAVEFORMS.includes(waveform)) return;
     store.set({ waveform });
     engine.setWaveform(waveform);
+  }
+
+  function setTimbre(timbre) {
+    if (!TIMBRES.includes(timbre)) return;
+    store.set({ timbre });
+    engine.setTimbre(timbre);
   }
 
   const vol = (v) => Math.min(1, Math.max(0, Number(v) || 0));
@@ -221,17 +309,82 @@ export function createController({ store, engine, storage = null, timers = globa
     if (type !== undefined) patch.natureType = type;
     if (volume !== undefined) patch.natureVolume = vol(volume);
     store.set(patch);
+    if (type !== undefined && NATURE_LABELS[type] && type !== 'off') announce(NATURE_LABELS[type]);
     return engine.setNature({ type, volume: patch.natureVolume });
   }
 
-  // ------------------------------------------------------------ misc
+  function setIllusion(type, volume) {
+    const patch = {};
+    if (type !== undefined) patch.illusionType = type;
+    if (volume !== undefined) patch.illusionVolume = vol(volume);
+    store.set(patch);
+    if (type !== undefined && ILLUSION_LABELS[type] && type !== 'off') announce(ILLUSION_LABELS[type]);
+    return engine.setIllusion({ type, volume: patch.illusionVolume });
+  }
+
+  function setVoices(voices) {
+    store.set({ voices });
+    engine.setVoices(voices);
+  }
+
+  function setVoice(index, patch) {
+    const voices = s().voices.map((v, i) => {
+      if (i !== index) return v;
+      const next = { ...v, ...patch };
+      if (patch.carrier !== undefined) next.carrier = sanitizeCarrier(patch.carrier);
+      if (patch.beat !== undefined) next.beat = sanitizeBeat(patch.beat);
+      if (patch.volume !== undefined) next.volume = vol(patch.volume);
+      return next;
+    });
+    setVoices(voices);
+  }
+
+  function setSpatial(rate) {
+    const n = Number(rate);
+    if (!SPATIAL_RATES.includes(n)) return;
+    store.set({ spatialRate: n });
+    engine.setSpatial(n);
+  }
+
+  function setLayerPulse(depth) {
+    const n = Number(depth);
+    if (!LAYER_PULSE_LEVELS.includes(n)) return;
+    store.set({ layerPulse: n });
+    engine.setLayerPulse(n);
+  }
+
+  function setBreathPattern(pattern) {
+    if (!BREATH_IDS.includes(pattern)) return;
+    idleBreathOrigin = now();
+    store.set({ breathPattern: pattern });
+    engine.setBreath({ pattern });
+  }
+
+  function setBreathCue(on) {
+    store.set({ breathCue: !!on });
+    engine.setBreath({ cue: !!on });
+  }
+
+  // Seconds into the current breathing cycle clock (visual pacer).
+  function getBreathTime() {
+    const st = s();
+    if (st.status === 'running' || st.status === 'paused') {
+      return Math.max(0, engine.elapsed - (st.breathCue ? engine.breathOrigin : 0));
+    }
+    return (now() - idleBreathOrigin) / 1000;
+  }
+
+  // ------------------------------------------------------------ session options
 
   function setSessionMinutes(m) {
     const n = Number(m);
     if (!SESSION_MINUTES.includes(n)) return;
     const st = s();
     const patch = { sessionMinutes: n };
-    if (st.status !== 'idle' && !activeProgram()) patch.duration = n > 0 ? n * 60 : Infinity;
+    if (st.status !== 'idle' && !activeProgram()) {
+      patch.duration = n > 0 ? n * 60 : Infinity;
+      engine.setSchedule({ duration: patch.duration });
+    }
     store.set(patch);
   }
 
@@ -239,6 +392,56 @@ export function createController({ store, engine, storage = null, timers = globa
     const n = Number(sec);
     if (FADE_IN_OPTIONS.includes(n)) store.set({ fadeIn: n });
   }
+
+  function setFadeDown(minutes) {
+    const n = Number(minutes);
+    if (!FADE_DOWN_OPTIONS.includes(n)) return;
+    store.set({ fadeDownMinutes: n });
+    engine.setSchedule({ fadeDownMinutes: n });
+  }
+
+  // ------------------------------------------------------------ export
+
+  function setExportMinutes(m) {
+    const v = m === 'program' ? m : Number(m);
+    if (EXPORT_MINUTES.includes(v)) store.set({ exportMinutes: v });
+  }
+
+  function setExportRate(r) {
+    const n = Number(r);
+    if (EXPORT_RATES.includes(n)) store.set({ exportRate: n });
+  }
+
+  function exportSeconds(st = s()) {
+    const program = activeProgram();
+    if (st.exportMinutes === 'program') return program ? Math.min(MAX_EXPORT_SECONDS, programDuration(program)) : 10 * 60;
+    return st.exportMinutes * 60;
+  }
+
+  async function exportAudio() {
+    const st = s();
+    if (st.exportStatus.state === 'rendering') return null;
+    const program = activeProgram();
+    const seconds = exportSeconds(st);
+    const name = program ? program.name : (findPreset(st.activePresetId)?.name || `${st.beat} Hz ${st.mode}`);
+    store.set({ exportStatus: { state: 'rendering', progress: 0, message: 'Rendering…' } });
+    try {
+      const wav = await exporter({
+        settings: engineSettings(st), program, seconds, sampleRate: st.exportRate,
+        fadeIn: st.fadeIn, fadeDownMinutes: st.fadeDownMinutes,
+        onProgress: (p) => store.set({ exportStatus: { state: 'rendering', progress: p, message: `Rendering… ${Math.round(p * 100)}%` } }),
+      });
+      const fileName = exportFileName(name, seconds);
+      store.set({ exportStatus: { state: 'done', progress: 1, message: `Saved ${fileName}` } });
+      announce('Export finished');
+      return { wav, fileName };
+    } catch (err) {
+      store.set({ exportStatus: { state: 'error', progress: 0, message: (err && err.message) || 'Export failed.' } });
+      return null;
+    }
+  }
+
+  // ------------------------------------------------------------ misc
 
   function setTheme(theme) { if (THEMES.includes(theme)) store.set({ theme }); }
   function setTab(tab) { if (TABS.includes(tab)) store.set({ tab }); }
@@ -279,14 +482,16 @@ export function createController({ store, engine, storage = null, timers = globa
     saveTimer = timers.setTimeout(() => { saveTimer = null; saveSettings(storage, s()); }, SAVE_DEBOUNCE_MS);
   });
 
-  engine.onNatureLoading = (loading) => store.set({ natureLoading: loading });
+  engine.onLoading = (types) => store.set({ loadingTypes: types.join(',') });
 
   return {
     start, pause, resume, stop, togglePlay,
-    setCarrier, setBeat, applyPreset, applyCarrierPreset, selectProgram,
-    setMode, setWaveform, setToneVolume, setMasterVolume, setNoise, setNature,
-    setSessionMinutes, setFadeIn, setTheme, setTab, setBandFilter,
-    acknowledge, openWelcome, closeWelcome, clearError, testChannels, onVisible,
+    setCarrier, setBeat, applyPreset, applySpecial, applyStack, applyCarrierPreset, selectProgram,
+    saveCustomProgram, deleteCustomProgram, findProgram: lookupProgram,
+    setMode, setWaveform, setTimbre, setToneVolume, setMasterVolume, setNoise, setNature, setIllusion,
+    setVoice, setVoices, setSpatial, setLayerPulse, setBreathPattern, setBreathCue, getBreathTime,
+    setSessionMinutes, setFadeIn, setFadeDown, setExportMinutes, setExportRate, exportSeconds, exportAudio,
+    setTheme, setTab, setBandFilter, acknowledge, openWelcome, closeWelcome, clearError, testChannels, onVisible,
     getAnalysers: () => engine.analysers,
     _tick: onTick, // exposed for tests
   };
@@ -296,6 +501,7 @@ export function runtimeState(settings) {
   return {
     status: 'idle', elapsed: 0, duration: settings.sessionMinutes > 0 ? settings.sessionMinutes * 60 : Infinity,
     live: { carrier: settings.carrier, beat: settings.beat, segmentIndex: -1, segmentLabel: '' },
-    natureLoading: false, error: null, welcomeOpen: false, testSide: null, announcement: null,
+    loadingTypes: '', error: null, welcomeOpen: false, testSide: null, announcement: null,
+    exportStatus: { state: 'idle', progress: 0, message: '' },
   };
 }

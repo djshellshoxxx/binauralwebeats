@@ -35,8 +35,10 @@ test('binaural start: L/R split, hard-panned routing, master cap', async () => {
   await engine.start({ carrier: 200, beat: 10, masterVolume: 1 }, { fadeIn: 0 });
   const s = engine.session;
   assert.equal(engine.state, 'running');
-  assert.equal(s.oscL.frequency.value, 195);
-  assert.equal(s.oscR.frequency.value, 205);
+  assert.equal(s.L.oscs[0].frequency.value, 195);
+  assert.equal(s.R.oscs[0].frequency.value, 205);
+  // pure timbre: only the main oscillator is audible
+  assert.deepEqual(s.L.gains.map((g) => g.gain.value), [1, 0, 0]);
   assert.equal(s.lfo.frequency.value, 10);
   assert.deepEqual([s.gLL, s.gLR, s.gRL, s.gRR].map((g) => g.gain.value), [1, 0, 0, 1]);
   assert.equal(s.lfoDepth.gain.value, 0);
@@ -51,8 +53,8 @@ test('isochronic mode: same carrier both ears, full AM depth', async () => {
   const { engine } = makeEngine();
   await engine.start({ mode: 'isochronic', carrier: 300, beat: 40 }, { fadeIn: 0 });
   const s = engine.session;
-  assert.equal(s.oscL.frequency.value, 300);
-  assert.equal(s.oscR.frequency.value, 300);
+  assert.equal(s.L.oscs[0].frequency.value, 300);
+  assert.equal(s.R.oscs[0].frequency.value, 300);
   assert.equal(s.lfoDepth.gain.value, 0.5);
   assert.equal(s.am.gain.value, 0.5);
   assert.ok(s.lfo.periodicWave, 'pulse wave set');
@@ -72,16 +74,16 @@ test('manual tone change glides with setTargetAtTime', async () => {
   await engine.start({ carrier: 200, beat: 10 }, { fadeIn: 0 });
   engine.setTone({ carrier: 250, beat: 4 });
   const s = engine.session;
-  assert.equal(s.oscL.frequency.value, 248);
-  assert.equal(s.oscR.frequency.value, 252);
-  assert.ok(s.oscL.frequency.calls.some((c) => c[0] === 'target'));
+  for (const o of s.L.oscs) assert.equal(o.frequency.value, 248);
+  for (const o of s.R.oscs) assert.equal(o.frequency.value, 252);
+  assert.ok(s.L.oscs[0].frequency.calls.some((c) => c[0] === 'target'));
 });
 
 test('program scheduling: exact linear ramps per segment; setTone ignored', async () => {
   const { ctx, engine } = makeEngine();
   ctx.currentTime = 100;
   await engine.start({}, { program, fadeIn: 0 });
-  const calls = engine.session.oscL.frequency.calls;
+  const calls = engine.session.L.oscs[0].frequency.calls;
   const ramps = calls.filter((c) => c[0] === 'linear');
   assert.deepEqual(ramps.map((c) => [c[1], c[2]]), [[177, 110], [148, 130]]); // 180-3, 150-2
   const lfoRamps = engine.session.lfo.frequency.calls.filter((c) => c[0] === 'linear');
@@ -108,36 +110,37 @@ test('stop fades out and stops all sources', async () => {
   const { engine } = makeEngine();
   await engine.start({ noiseType: 'white' }, { fadeIn: 0 });
   const s = engine.session;
-  assert.ok(s.noise, 'noise layer started');
+  const noise = s.layers.noise;
+  assert.ok(noise, 'noise layer started');
   await engine.stop(0.001);
   assert.equal(engine.state, 'idle');
   assert.equal(engine.session, null);
-  assert.notEqual(s.oscL.stopped, null);
-  assert.notEqual(s.noise.src.stopped, null);
+  assert.notEqual(s.L.oscs[0].stopped, null);
+  assert.notEqual(noise.src.stopped, null);
   assert.equal(s.fade.gain.value, 0);
 });
 
 test('noise layer crossfades when the type changes', async () => {
   const { engine } = makeEngine();
   await engine.start({ noiseType: 'pink' }, { fadeIn: 0 });
-  const first = engine.session.noise;
+  const first = engine.session.layers.noise;
   engine.setNoise({ type: 'brown' });
-  const second = engine.session.noise;
+  const second = engine.session.layers.noise;
   assert.notEqual(first, second);
   assert.equal(first.gain.gain.value, 0);
   assert.notEqual(first.src.stopped, null);
   engine.setNoise({ type: 'off' });
-  assert.equal(engine.session.noise, null);
+  assert.equal(engine.session.layers.noise, null);
   await engine.stop(0.001);
 });
 
 test('nature layer renders (main-thread fallback) and starts looping', async () => {
   const { engine } = makeEngine();
   const loading = [];
-  engine.onNatureLoading = (v) => loading.push(v);
+  engine.onLoading = (types) => loading.push(types.length > 0);
   await engine.start({}, { fadeIn: 0 });
-  await engine.setNature({ type: 'rain', volume: 0.5 });
-  const nat = engine.session.nature;
+  await engine.setNature({ type: 'stream', volume: 0.5 });
+  const nat = engine.session.layers.nature;
   assert.ok(nat, 'nature started');
   assert.equal(nat.src.loop, true);
   assert.equal(nat.src.buffer.numberOfChannels, 2);

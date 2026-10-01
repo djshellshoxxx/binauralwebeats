@@ -55,3 +55,27 @@ test('invalid values are dropped, garbage is tolerated', () => {
   assert.equal(saveSettings(throwing, DEFAULT_SETTINGS), false);
   assert.deepEqual(loadSettings(null), {});
 });
+
+test('v2 keys validate; invalid custom programs are dropped', () => {
+  const storage = memoryStorage();
+  const good = { id: 'custom-1', name: 'Mine', segments: [{ label: 'a', duration: 60, beat: [10, 5], carrier: [200, 200] }] };
+  const bad = { id: 'custom-2', name: 'Broken', segments: [{ label: 'a', duration: -1, beat: [10, 5], carrier: [200, 200] }] };
+  storage.setItem(STORAGE_KEY, JSON.stringify({
+    mode: 'bilateral', timbre: 'pad', spatialRate: 4, layerPulse: 0.3, illusionType: 'shepard-up',
+    breathPattern: '478', breathCue: true, fadeDownMinutes: 10, exportMinutes: 'program', exportRate: 44100,
+    voices: [{ on: true, carrier: 400, beat: 40, volume: 0.5 }, { on: false, carrier: 100, beat: 2, volume: 0.5 }],
+    customPrograms: [good, bad, { id: 'sleep', name: 'imposter', segments: good.segments }],
+    activeProgramId: 'custom-2',
+  }));
+  const s = loadSettings(storage);
+  assert.equal(s.mode, 'bilateral');
+  assert.equal(s.timbre, 'pad');
+  assert.equal(s.spatialRate, 4);
+  assert.equal(s.breathPattern, '478');
+  assert.equal(s.exportMinutes, 'program');
+  assert.equal(s.voices[0].on, true);
+  assert.deepEqual(s.customPrograms.map((p) => p.id), ['custom-1']);
+  assert.equal(s.activeProgramId, null, 'selection of a dropped program is cleared');
+  storage.setItem(STORAGE_KEY, JSON.stringify({ spatialRate: 5, voices: [{ on: 'yes' }], timbre: 'fuzzy' }));
+  assert.deepEqual(loadSettings(storage), {});
+});

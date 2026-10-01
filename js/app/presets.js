@@ -24,7 +24,38 @@ export const MODE_INFO = Object.freeze({
     blurb: 'One tone pulsed on and off at the beat rate. The strongest, most obvious pulse. Works on speakers.',
     headphones: 'recommended',
   },
+  bilateral: {
+    name: 'Bilateral',
+    blurb: 'The tone alternates left \u2194 right at the beat rate (best at 0.5\u20132 Hz), like EMDR-style bilateral stimulation. Headphones required.',
+    headphones: 'required',
+  },
 });
+
+// Special techniques that set the beat mode (spec 07 §2).
+export const BILATERAL_PRESETS = Object.freeze([
+  { id: 'bilateral-05', name: 'Slow Sway', beat: 0.5, carrier: 220, mode: 'bilateral',
+    description: 'A slow left-right sway, one side every second. Soothing and grounding; good for settling a racing mind.' },
+  { id: 'bilateral-1', name: 'Classic Bilateral', beat: 1, carrier: 300, mode: 'bilateral',
+    description: 'One full left-right cycle per second, the pace often used in EMDR-style bilateral stimulation for processing and calm.' },
+  { id: 'bilateral-2', name: 'Brisk Bilateral', beat: 2, carrier: 300, mode: 'bilateral',
+    description: 'A quicker alternation that feels more activating. Used for focus and "unsticking" repetitive thoughts.' },
+].map(Object.freeze));
+
+// Multi-voice "Hemi-Sync-style" stacks (spec 07 §4).
+export const VOICE_STACKS = Object.freeze([
+  { id: 'stack-focus', name: 'Focus Stack', beat: 14, carrier: 220,
+    voices: [{ on: true, carrier: 400, beat: 40, volume: 0.5 }, { on: true, carrier: 150, beat: 10, volume: 0.5 }],
+    description: 'SMR focus on top of a calm alpha bed, with a touch of 40 Hz gamma for alertness.' },
+  { id: 'stack-sleep', name: 'Sleep Stack', beat: 3, carrier: 130,
+    voices: [{ on: true, carrier: 100, beat: 1.5, volume: 0.5 }, { on: true, carrier: 180, beat: 6, volume: 0.4 }],
+    description: 'Layered delta and theta for drifting into deep sleep.' },
+  { id: 'stack-meditate', name: 'Meditation Stack', beat: 7.83, carrier: 200,
+    voices: [{ on: true, carrier: 150, beat: 4.5, volume: 0.5 }, { on: true, carrier: 260, beat: 10, volume: 0.4 }],
+    description: 'Schumann-resonance theta depth with an alpha layer to stay clear and present.' },
+  { id: 'stack-creative', name: 'Creative Stack', beat: 6, carrier: 200,
+    voices: [{ on: true, carrier: 300, beat: 10, volume: 0.45 }, { on: true, carrier: 440, beat: 40, volume: 0.35 }],
+    description: 'Theta for ideas, alpha for ease and a gamma spark for "aha" moments.' },
+].map(Object.freeze));
 
 export const BEAT_PRESETS = Object.freeze([
   { id: 'epsilon-05', name: 'Epsilon Stillness', beat: 0.5, carrier: 100, band: 'epsilon',
@@ -177,4 +208,9 @@ export const PROGRAMS = Object.freeze([
 
 export const findPreset = (id) => BEAT_PRESETS.find((p) => p.id === id) || null;
 export const findCarrier = (id) => CARRIER_PRESETS.find((p) => p.id === id) || null;
-export const findProgram = (id) => PROGRAMS.find((p) => p.id === id) || null;
+export function findProgram(id, customPrograms = []) {
+  if (!id) return null;
+  return PROGRAMS.find((p) => p.id === id) || customPrograms.find((p) => p.id === id) || null;
+}
+export const findSpecial = (id) => BILATERAL_PRESETS.find((p) => p.id === id) || null;
+export const findStack = (id) => VOICE_STACKS.find((p) => p.id === id) || null;

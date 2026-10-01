@@ -40,7 +40,8 @@ server-side logic, no account and no tracking.
 | `03-wiring.md`  | State store, controller, data flow, events, persistence, the session lifecycle state machine. |
 | `04-presets.md` | Brainwave bands, quick presets, built-in programs and their data format. |
 | `05-quality.md` | Testing, browser support, performance budgets, deployment, CI. |
-| `06-roadmap.md` | Other audio techniques that could be added next. |
+| `06-roadmap.md` | Other audio techniques (all built in v2). |
+| `07-v2-features.md` | Spec for v2: bilateral, pad timbre, voices, fade-down, 8D, pulse, Shepard, breathing, more nature, editor, PWA, export. |
 
 ## 5. Architecture at a glance
 
@@ -74,16 +75,22 @@ js/engine/frequency.js     pure maths (split, bands, clamping)
 js/engine/noise.js         pure noise sample generators
 js/engine/ambience.js      pure procedural nature sounds (waves, rain, thunder)
 js/engine/ambience-worker.js  renders nature sounds off the main thread
+js/engine/breath.js        pure breathing-pattern maths
+js/engine/wav.js           pure WAV encoder
 js/engine/program.js       pure program timeline maths
 js/engine/audio-engine.js  Web Audio graph + scheduling
 js/app/store.js            tiny pub/sub store
 js/app/persistence.js      localStorage load/save (fail-safe)
 js/app/presets.js          bands, quick presets, programs
 js/app/controller.js       wiring + session state machine
+js/app/exporter.js         offline render -> WAV
 js/ui/dom.js               DOM helpers
 js/ui/controls.js          binds controls <-> controller/store
 js/ui/knob.js              accessible rotary volume knob
 js/ui/system.js            keyboard shortcuts, Media Session, wake lock
+js/ui/editor.js            program editor dialog
+js/ui/pwa.js               service worker registration + install button
+sw.js, manifest.webmanifest, icons/   installable / offline app
 js/ui/visualizer.js        canvas renderer
 js/ui/format.js            pure formatting helpers
 tests/*.test.js            node:test unit tests (pure modules)

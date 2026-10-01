@@ -1,5 +1,9 @@
 # 06 — Roadmap: other audio techniques
 
+> **Status: all 12 items below are built (v2).** See `07-v2-features.md` for
+> the spec they were built to. The one change from the sketches: export is WAV
+> only (MP3 would need a third-party encoder, against the no-dependencies rule).
+
 This is a list of other sound-based "brainwave" or relaxation techniques that
 fit this app's engine. v1 already ships **binaural beats**, **monaural beats**,
 **isochronic tones**, **noise colours** (white / pink / brown) and **nature
@@ -21,4 +25,4 @@ would plug into the existing architecture.
 | 11 | **Offline / installable (PWA)** | Install to the home screen; works with no connection. | A manifest + a service worker that caches the static files. | S |
 | 12 | **Export to audio file** | Render a session to WAV/MP3 to play anywhere. | `OfflineAudioContext` with the same graph, then WAV encoding. | M |
 
-Recommended next steps, in order of value per effort: **8, 1, 6, 2, 11**.
+

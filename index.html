@@ -4,9 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Binaural We Beats</title>
-  <meta name="description" content="Binaural, monaural and isochronic beat generator with noise and nature soundscapes. Runs entirely in your browser.">
+  <meta name="description" content="Binaural, monaural, isochronic and bilateral beat generator with noise, nature soundscapes, breathing pacer, programs and WAV export. Runs entirely in your browser.">
   <meta name="theme-color" content="#0b1020">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='22' cy='32' r='16' fill='%2338bdf8' fill-opacity='.8'/%3E%3Ccircle cx='42' cy='32' r='16' fill='%23f472b6' fill-opacity='.8'/%3E%3C/svg%3E">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="We Beats">
   <link rel="stylesheet" href="css/styles.css">
   <script type="module" src="js/main.js"></script>
 </head>
@@ -22,6 +26,7 @@
       <h1>Binaural We Beats</h1>
     </div>
     <div class="topbar-actions">
+      <button id="install" class="pill-btn" type="button" hidden>⤓ Install app</button>
       <button id="theme-toggle" class="icon-btn" type="button" aria-label="Theme: auto">◐</button>
       <button id="help" class="icon-btn" type="button" aria-label="Help, safety and shortcuts">?</button>
     </div>
@@ -37,6 +42,7 @@
     <section class="card hero" aria-label="Player">
       <div class="viz-wrap">
         <canvas id="viz" aria-hidden="true"></canvas>
+        <p id="breath-label" class="breath-label" aria-live="off" hidden></p>
         <div class="viz-overlay">
           <span id="band-chip" class="chip band-chip">Alpha</span>
           <span id="beat-readout" class="beat-readout">10.00 Hz</span>
@@ -77,10 +83,11 @@
       <div id="panel-manual" role="tabpanel" aria-labelledby="tab-manual">
         <fieldset class="field">
           <legend>Beat type</legend>
-          <div class="segmented" id="mode-group">
+          <div class="segmented four" id="mode-group">
             <label><input type="radio" name="mode" value="binaural" checked><span>Binaural</span></label>
             <label><input type="radio" name="mode" value="monaural"><span>Monaural</span></label>
             <label><input type="radio" name="mode" value="isochronic"><span>Isochronic</span></label>
+            <label><input type="radio" name="mode" value="bilateral"><span>Bilateral</span></label>
           </div>
           <p id="mode-blurb" class="hint"></p>
         </fieldset>
@@ -107,6 +114,13 @@
         </div>
 
         <div class="field-grid">
+          <div class="field">
+            <label for="timbre">Timbre</label>
+            <select id="timbre">
+              <option value="pure">Pure tone</option>
+              <option value="pad">Warm pad</option>
+            </select>
+          </div>
           <div class="field">
             <label for="waveform">Waveform</label>
             <select id="waveform">
@@ -141,7 +155,27 @@
               <option value="30">30 s</option>
             </select>
           </div>
+          <div class="field">
+            <label for="fadedown">Sleep fade-down</label>
+            <select id="fadedown">
+              <option value="0">Off</option>
+              <option value="5">Last 5 min</option>
+              <option value="10">Last 10 min</option>
+              <option value="15">Last 15 min</option>
+              <option value="20">Last 20 min</option>
+              <option value="30">Last 30 min</option>
+            </select>
+          </div>
         </div>
+        <p id="timbre-hint" class="hint"></p>
+
+        <details class="carriers" id="voices-details">
+          <summary>Extra voices <span class="muted">(layered multi-frequency)</span></summary>
+          <p class="hint">Stack up to two more binaural pairs on top of the main beat, Hemi-Sync style. Extra voices are always binaural (headphones) and stay constant during programs.</p>
+          <div id="voice-rows" class="voice-rows"></div>
+          <p class="sub-head">Quick stacks</p>
+          <ul id="stack-list" class="stack-list"></ul>
+        </details>
 
         <details class="carriers">
           <summary>Carrier tone presets <span class="muted">(Solfeggio, 432 Hz…)</span></summary>
@@ -152,22 +186,28 @@
 
       <div id="panel-programs" role="tabpanel" aria-labelledby="tab-programs" hidden>
         <p class="hint">Programs glide the beat frequency over time to guide you from one state to another. Select one, then press play.</p>
+        <div class="program-actions-top">
+          <button id="program-new" class="pill-btn" type="button">＋ New program</button>
+          <button id="program-clear" class="text-btn" type="button">← Back to manual</button>
+        </div>
+        <h3 id="custom-title" class="list-title" hidden>My programs</h3>
+        <ul id="custom-program-list" class="program-list"></ul>
+        <h3 class="list-title">Built-in programs</h3>
         <ul id="program-list" class="program-list"></ul>
-        <button id="program-clear" class="text-btn" type="button">← Back to manual</button>
       </div>
     </section>
 
     <!-- MIXER ---------------------------------------------------------- -->
     <section class="card mixer" aria-labelledby="mixer-title">
       <h2 id="mixer-title">Mixer</h2>
-      <p class="hint">Layer noise or nature sounds over the beats. Background layers play while a session is running.</p>
+      <p class="hint">Layer noise, nature or an illusion tone over the beats. Background layers play while a session is running.</p>
       <div class="mixer-grid">
         <div class="channel">
-          <div id="knob-tone" class="knob-slot" data-label="Beats"></div>
+          <div id="knob-tone" class="knob-slot"></div>
           <span class="channel-name">Beats</span>
         </div>
         <div class="channel">
-          <div id="knob-noise" class="knob-slot" data-label="Noise volume"></div>
+          <div id="knob-noise" class="knob-slot"></div>
           <label class="channel-name" for="noise-type">Noise</label>
           <select id="noise-type">
             <option value="off">Off</option>
@@ -177,22 +217,94 @@
           </select>
         </div>
         <div class="channel">
-          <div id="knob-nature" class="knob-slot" data-label="Nature volume"></div>
+          <div id="knob-nature" class="knob-slot"></div>
           <label class="channel-name" for="nature-type">Nature</label>
-          <select id="nature-type">
-            <option value="off">Off</option>
-            <option value="waves">Crashing waves</option>
-            <option value="rain">Rain</option>
-            <option value="thunder">Thunder</option>
-            <option value="rainthunder">Rain + thunder</option>
-          </select>
+          <select id="nature-type"></select>
           <span id="nature-status" class="status-text" aria-live="polite"></span>
         </div>
+        <div class="channel">
+          <div id="knob-illusion" class="knob-slot"></div>
+          <label class="channel-name" for="illusion-type">Illusion</label>
+          <select id="illusion-type"></select>
+          <span id="illusion-status" class="status-text" aria-live="polite"></span>
+        </div>
         <div class="channel master">
-          <div id="knob-master" class="knob-slot" data-label="Master volume"></div>
+          <div id="knob-master" class="knob-slot"></div>
           <span class="channel-name">Master</span>
         </div>
       </div>
+      <div class="effects">
+        <div class="field">
+          <label for="spatial">8D spatial sweep</label>
+          <select id="spatial">
+            <option value="0">Off</option>
+            <option value="2">Very slow (2 / min)</option>
+            <option value="4">Slow (4 / min)</option>
+            <option value="8">Medium (8 / min)</option>
+            <option value="16">Fast (16 / min)</option>
+          </select>
+          <p class="hint">Background layers drift around your head. The beat tones stay put so the binaural effect is not disturbed.</p>
+        </div>
+        <div class="field">
+          <label for="layer-pulse">Pulse background at beat rate</label>
+          <select id="layer-pulse">
+            <option value="0">Off</option>
+            <option value="0.3">Subtle</option>
+            <option value="0.6">Medium</option>
+            <option value="1">Strong</option>
+          </select>
+          <p class="hint">Gently throbs the noise / nature / illusion layers in time with the beat, for extra entrainment.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- BREATHING ------------------------------------------------------ -->
+    <section class="card breathing" aria-labelledby="breath-title">
+      <h2 id="breath-title">Breathing pacer</h2>
+      <p class="hint">Breathe along with the glowing orb. Turn on the audio cue to follow it with your eyes closed: the sound swells as you breathe in and softens as you breathe out.</p>
+      <div class="field-grid">
+        <div class="field">
+          <label for="breath-pattern">Pattern</label>
+          <select id="breath-pattern"></select>
+        </div>
+        <div class="field check-field">
+          <label class="check"><input id="breath-cue" type="checkbox"> Audio cue</label>
+        </div>
+      </div>
+      <p id="breath-desc" class="hint"></p>
+    </section>
+
+    <!-- EXPORT --------------------------------------------------------- -->
+    <section class="card export" aria-labelledby="export-title">
+      <h2 id="export-title">Download as audio</h2>
+      <p class="hint">Render your current settings (beats, voices, layers, effects, breathing cue, program) to a WAV file you can play anywhere.</p>
+      <div class="field-grid">
+        <div class="field">
+          <label for="export-minutes">Length</label>
+          <select id="export-minutes">
+            <option value="1">1 min</option>
+            <option value="5">5 min</option>
+            <option value="10">10 min</option>
+            <option value="15">15 min</option>
+            <option value="20">20 min</option>
+            <option value="30">30 min</option>
+            <option value="program">Program length</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="export-rate">Quality</label>
+          <select id="export-rate">
+            <option value="22050">Small (22 kHz)</option>
+            <option value="44100">CD (44.1 kHz)</option>
+          </select>
+        </div>
+      </div>
+      <p id="export-size" class="hint"></p>
+      <div class="export-row">
+        <button id="export-go" class="primary-btn" type="button">Render &amp; download WAV</button>
+      </div>
+      <div class="progress export-progress" aria-hidden="true"><div id="export-bar" class="progress-bar"></div></div>
+      <p id="export-status" class="status-text" aria-live="polite"></p>
     </section>
 
     <!-- CATALOGUE ------------------------------------------------------ -->
@@ -202,6 +314,14 @@
       <ul id="band-legend" class="band-legend"></ul>
       <div id="band-filter" class="filter-chips" role="group" aria-label="Filter by band"></div>
       <ul id="preset-grid" class="preset-grid"></ul>
+
+      <h3 class="list-title">Bilateral (EMDR-style)</h3>
+      <p class="hint">The sound alternates between your left and right ear. 🎧 Headphones required.</p>
+      <ul id="special-grid" class="preset-grid"></ul>
+
+      <h3 class="list-title">Voice stacks</h3>
+      <p class="hint">Several binaural frequencies layered at once. Loads the main beat plus two extra voices.</p>
+      <ul id="stack-grid" class="preset-grid"></ul>
       <p id="disclaimer" class="disclaimer"></p>
     </section>
 
@@ -222,11 +342,19 @@
           <p>A single tone switched on and off at the beat rate. This is the most pronounced pulse of the three and it works on speakers.</p>
         </div>
         <div>
+          <h3>Bilateral stimulation</h3>
+          <p>The tone moves from ear to ear, like the alternating sounds used in EMDR-style practice. Slow rates (0.5–2 Hz) feel soothing and grounding.</p>
+        </div>
+        <div>
           <h3>Noise &amp; nature</h3>
-          <p>White, pink and brown noise or rain, waves and thunder mask distractions and make long sessions more pleasant. Brown noise and waves are the softest.</p>
+          <p>Noise colours and synthesised rain, waves, thunder, wind, a stream, fire, forest birds or a cat's purr mask distractions. Everything is generated live, with no recordings.</p>
+        </div>
+        <div>
+          <h3>Shepard illusion</h3>
+          <p>Overlapping octaves fade in and out to create a tone that seems to rise (or fall) forever. Rising feels like anticipation and focus; falling feels like letting go.</p>
         </div>
       </div>
-      <p class="hint">Shortcuts: <kbd>Space</kbd> play/pause · <kbd>Esc</kbd> stop.</p>
+      <p class="hint">Shortcuts: <kbd>Space</kbd> play/pause · <kbd>Esc</kbd> stop. Install it from your browser menu to use it offline.</p>
     </section>
   </main>
 
@@ -250,6 +378,41 @@
       <p class="hint">Tip: press <strong>L/R</strong> next to the play button to check that your headphones are on the right way round.</p>
       <p class="hint">Shortcuts: <kbd>Space</kbd> play/pause · <kbd>Esc</kbd> stop.</p>
       <button id="welcome-ok" class="primary-btn" value="ok">I'm wearing headphones. Continue</button>
+    </form>
+  </dialog>
+
+  <!-- PROGRAM EDITOR ---------------------------------------------------- -->
+  <dialog id="editor" class="editor-dialog" aria-labelledby="editor-title">
+    <form id="editor-form" class="editor" novalidate>
+      <h2 id="editor-title">New program</h2>
+      <div class="field-grid two">
+        <div class="field">
+          <label for="ed-name">Name</label>
+          <input id="ed-name" type="text" maxlength="60" required>
+        </div>
+        <div class="field">
+          <label for="ed-desc">Description</label>
+          <input id="ed-desc" type="text" maxlength="240">
+        </div>
+      </div>
+      <div class="seg-table-wrap">
+        <table class="seg-table">
+          <thead>
+            <tr><th scope="col">#</th><th scope="col">Label</th><th scope="col">Min</th><th scope="col">Beat from → to (Hz)</th><th scope="col">Carrier from → to (Hz)</th><th scope="col"><span class="sr-only">Actions</span></th></tr>
+          </thead>
+          <tbody id="ed-segments"></tbody>
+        </table>
+      </div>
+      <div class="editor-bar">
+        <button id="ed-add" class="pill-btn" type="button">＋ Add segment</button>
+        <span id="ed-total" class="muted"></span>
+      </div>
+      <div id="ed-timeline" class="timeline big" aria-hidden="true"></div>
+      <ul id="ed-errors" class="errors" role="alert"></ul>
+      <div class="editor-actions">
+        <button id="ed-cancel" class="text-btn" type="button">Cancel</button>
+        <button id="ed-save" class="primary-btn" type="submit">Save program</button>
+      </div>
     </form>
   </dialog>
 

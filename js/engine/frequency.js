@@ -5,7 +5,8 @@ export const LIMITS = Object.freeze({
   beat: Object.freeze({ min: 0.5, max: 45, default: 10, step: 0.01 }),
 });
 
-export const MODES = Object.freeze(['binaural', 'monaural', 'isochronic']);
+export const MODES = Object.freeze(['binaural', 'monaural', 'isochronic', 'bilateral']);
+export const TIMBRES = Object.freeze(['pure', 'pad']);
 export const WAVEFORMS = Object.freeze(['sine', 'triangle', 'square', 'sawtooth']);
 
 export const BANDS = Object.freeze([
@@ -44,7 +45,7 @@ export function splitFrequencies(carrier, beat) {
 
 // Oscillator frequencies for a given beat mode (see spec 01 §2).
 export function oscFrequencies(mode, carrier, beat) {
-  if (mode === 'isochronic') return { left: carrier, right: carrier };
+  if (mode === 'isochronic' || mode === 'bilateral') return { left: carrier, right: carrier };
   return splitFrequencies(carrier, beat);
 }
 

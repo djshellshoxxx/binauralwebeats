@@ -39,3 +39,19 @@ test('every mode has info, and binaural requires headphones', () => {
   for (const m of MODES) assert.ok(MODE_INFO[m]);
   assert.equal(MODE_INFO.binaural.headphones, 'required');
 });
+
+test('bilateral presets and voice stacks are within limits', async () => {
+  const { BILATERAL_PRESETS, VOICE_STACKS } = await import('../js/app/presets.js');
+  for (const p of BILATERAL_PRESETS) {
+    assert.equal(p.mode, 'bilateral');
+    assert.ok(p.beat >= 0.5 && p.beat <= 2, p.id);
+    assert.ok(inRange(p.carrier, LIMITS.carrier), p.id);
+  }
+  for (const s of VOICE_STACKS) {
+    assert.equal(s.voices.length, 2, s.id);
+    for (const v of [s, ...s.voices]) {
+      assert.ok(inRange(v.beat, LIMITS.beat), s.id);
+      assert.ok(inRange(v.carrier, LIMITS.carrier), s.id);
+    }
+  }
+});

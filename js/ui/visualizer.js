@@ -1,8 +1,11 @@
-// Canvas visualizer (spec 02 §9): beat-rate pulse orb + per-channel waveforms.
+// Canvas visualizer (spec 02 §9, spec 07 §9): beat-rate pulse orb (or breathing
+// pacer) + per-channel waveforms.
 
 import { bandFor } from '../engine/frequency.js';
+import { BREATH_PATTERNS, breathAt } from '../engine/breath.js';
 
-export function createVisualizer(canvas, { store, getAnalysers }) {
+export function createVisualizer(canvas, { store, getAnalysers, getBreathTime = () => 0, breathLabel = null }) {
+  let lastLabel = '';
   const ctx = canvas.getContext('2d');
   const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   let bufL = null;
@@ -51,19 +54,31 @@ export function createVisualizer(canvas, { store, getAnalysers }) {
     const color = bandFor(st.live.beat).color;
     const active = st.status === 'running' || st.status === 'paused';
 
-    // Pulse orb at the beat rate (slow breathing when idle).
+    // Breathing pacer replaces the beat pulse when a pattern is selected.
+    const pattern = BREATH_PATTERNS[st.breathPattern];
+    let label = '';
     let pulse;
-    if (st.status === 'running') {
+    if (pattern) {
+      const b = breathAt(pattern, getBreathTime());
+      pulse = b.level;
+      label = `${b.label} · ${Math.max(1, Math.ceil(b.remaining))}`;
+    } else if (st.status === 'running') {
       const beat = st.live.beat;
       // Reduced motion: a gentle step at most twice per second instead of a fast pulse.
       pulse = reduceMotion ? (Math.floor(t * 2) % 2 ? 0.65 : 0.35) : 0.5 + 0.5 * Math.cos(2 * Math.PI * beat * t);
     } else {
       pulse = reduceMotion ? 0.5 : 0.5 + 0.5 * Math.sin(t * 0.8);
     }
+    if (breathLabel && label !== lastLabel) {
+      breathLabel.textContent = label;
+      breathLabel.hidden = !label;
+      lastLabel = label;
+    }
     const base = Math.min(w, h) * 0.22;
-    const r = base * (0.85 + 0.25 * pulse * (active ? 1 : 0.4));
+    const swing = pattern ? 0.9 : 0.25 * (active ? 1 : 0.4);
+    const r = base * ((pattern ? 0.55 : 0.85) + swing * pulse);
     const g = ctx.createRadialGradient(w / 2, h * 0.42, 0, w / 2, h * 0.42, r * 1.8);
-    const alpha = active ? 0.35 + 0.45 * pulse : 0.18 + 0.1 * pulse;
+    const alpha = active || pattern ? 0.3 + 0.45 * pulse : 0.18 + 0.1 * pulse;
     g.addColorStop(0, hexA(color, alpha));
     g.addColorStop(0.5, hexA(color, alpha * 0.4));
     g.addColorStop(1, hexA(color, 0));

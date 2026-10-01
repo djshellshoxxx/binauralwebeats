@@ -27,6 +27,7 @@ class FakeOscillator extends FakeNode {
     super(ctx, 'oscillator');
     this.type = 'sine';
     this.frequency = new FakeParam(440);
+    this.detune = new FakeParam(0);
     this.started = null;
     this.stopped = null;
     this.periodicWave = null;
@@ -68,6 +69,14 @@ export class FakeAudioContext {
     return c;
   }
   createPeriodicWave(real, imag) { return { real, imag }; }
+  createStereoPanner() { const p = new FakeNode(this, 'panner'); p.pan = new FakeParam(0); return p; }
+  createBiquadFilter() {
+    const f = new FakeNode(this, 'biquad');
+    f.type = 'lowpass';
+    f.frequency = new FakeParam(350);
+    f.Q = new FakeParam(1);
+    return f;
+  }
   createBuffer(channels, length, sampleRate) {
     const data = Array.from({ length: channels }, () => new Float32Array(length));
     return {
