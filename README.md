@@ -102,6 +102,14 @@ There is nothing to install. The tests cover the frequency maths, programs,
 presets, noise and nature synthesis, the store and persistence, the controller
 state machine, and the audio engine (against a fake `AudioContext`).
 
+## Verification status
+
+In a documentation pass on Linux with Node v22.22.0, `npm test` ran 95 tests: 95 passed, 0 failed. Browser behaviour (audio output, the headphone check, PWA install and the WAV download) was not tested in that pass.
+
+## Wiki
+
+Wiki pages are in [`docs/wiki/`](docs/wiki/Home.md).
+
 ## Specs
 
 The app was built to these specs in [`docs/specs/`](docs/specs):
